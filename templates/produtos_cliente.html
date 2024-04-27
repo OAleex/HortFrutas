@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Cliente - Consumir</title>
+</head>
+<body>
+    <h1>Cliente - Consumir</h1>
+    <h2>Lista de Frutas</h2>
+    <div id="product-list"></div>
+    <button onclick="location.href='/logout'">Logout</button>
+
+   <script>
+    window.onload = function() {
+        fetch('/products')
+            .then(response => response.json())
+            .then(data => {
+                const productList = document.getElementById('product-list');
+                data.forEach(product => {
+                    productList.innerHTML += `<p>Nome: ${product.nome} - Marca: ${product.marca} - Preço: R$${product.preco} - Validade: ${product.validade} - Quantidade: ${product.quantidade}</p>`;
+                });
+            })
+            .catch(error => console.error('Erro ao buscar frutas:', error));
+    };
+</script>
+
+</body>
+</html>
