@@ -1,4 +1,5 @@
 import psycopg2
+from psycopg2.extras import RealDictCursor
 
 
 def conectardb():
@@ -30,10 +31,13 @@ def adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem):
 
 def listarprodutos():
     conexao = conectardb()
-    cur = conexao.cursor()
-    cur.execute("SELECT nome, marca, validade, preco, quantidade FROM produtos")
+    cur = conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor)  # Garanta que está usando RealDictCursor
+    cur.execute("SELECT nome, marca, validade, preco, quantidade, caminho_imagem FROM produtos")
     produtos = cur.fetchall()
     conexao.close()
+    return produtos
+
+
 
     lista_produtos = []
     for produto in produtos:
