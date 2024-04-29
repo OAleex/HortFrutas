@@ -46,30 +46,36 @@ def consume_product(product_name):
     if produto is None:
         return jsonify({'error': 'Produto não encontrado'}), 404
 
-    # Implemente a lógica de consumo aqui, se necessário
     return jsonify({'message': f'Você consumiu o produto: {product_name}'}), 200
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'usuario_id' in session:
-        # Se já estiver logado, retorna uma resposta JSON indicando sucesso.
-        return jsonify({"message": "Already logged in", "status": "success", "redirect": url_for('home')}), 200
+        if request.headers.get('Accept') == 'application/json':
+            return jsonify({"message": "Already logged in"}), 200
+        else:
+            return redirect(url_for('home'))
 
     if request.method == 'POST':
         email = request.form.get('email')
         senha = request.form.get('senha')
         usuario = dao.verificarlogin(email, senha)
+
         if usuario:
             session['usuario_id'] = usuario['id']
             session['perfil'] = usuario['perfil']
-            # Retorna sucesso com uma indicação para redirecionar no cliente, se necessário.
-            return jsonify({"message": "Login successful", "status": "success", "redirect": url_for('home')}), 200
-        else:
-            # Retorna falha com uma mensagem de erro.
-            return jsonify({"message": "Email or password incorrect", "status": "failure"}), 401
 
-    # Se for uma requisição GET, simplesmente mostra o formulário de login (pode ser alterado para JSON se necessário).
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({"message": "Login successful", "status": "success"}), 200
+            else:
+                return redirect(url_for('home'))
+        else:
+            if request.headers.get('Accept') == 'application/json':
+                return jsonify({"message": "Email or password incorrect", "status": "failure"}), 401
+            else:
+                return render_template('login.html', error="Email ou senha incorretos")
+
     return render_template('login.html')
 
 
@@ -106,10 +112,10 @@ def add_product():
 
 
 def handle_image_upload(imagem):
-    filename = secure_filename(imagem.filename)  # Garante que o nome do arquivo seja seguro
+    filename = secure_filename(imagem.filename)
     caminho_imagem = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     imagem.save(caminho_imagem)
-    return filename  # Retorna apenas o nome do arquivo
+    return filename
 
 
 

@@ -42,7 +42,7 @@ def buscar_produto_por_nome(nome):
 
 def listarprodutos():
     conexao = conectardb()
-    cur = conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor)  # Garanta que está usando RealDictCursor
+    cur = conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
     cur.execute("SELECT nome, marca, validade, preco, quantidade, caminho_imagem FROM produtos")
     produtos = cur.fetchall()
     conexao.close()
@@ -88,7 +88,6 @@ def verificarlogin(email, senha):
 def criar_tabelas():
     conexao = conectardb()
     cur = conexao.cursor()
-    # Criação de tabela de usuários, se não existir
     cur.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id SERIAL PRIMARY KEY,
@@ -97,7 +96,6 @@ def criar_tabelas():
             perfil VARCHAR(50) NOT NULL
         );
     """)
-    # Criação de tabela de produtos, se não existir
     cur.execute("""
         CREATE TABLE IF NOT EXISTS produtos (
             id SERIAL PRIMARY KEY,
@@ -113,6 +111,5 @@ def criar_tabelas():
     cur.close()
     conexao.close()
 
-# Chame esta função no início do seu script para garantir que as tabelas existam
 if __name__ == '__main__':
     criar_tabelas()
