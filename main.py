@@ -36,10 +36,26 @@ def register():
             return render_template('registro.html', error='Falha ao registrar. O email já pode estar em uso.')
     return render_template('registro.html')
 
+
+@app.route('/consume/<product_name>', methods=['GET'])
+def consume_product(product_name):
+    if 'perfil' not in session or session['perfil'] != 'ADM':
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    produto = dao.buscar_produto_por_nome(product_name)
+    if produto is None:
+        return jsonify({'error': 'Produto não encontrado'}), 404
+
+    # Implemente a lógica de consumo aqui, se necessário
+    return jsonify({'message': f'Você consumiu o produto: {product_name}'}), 200
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'usuario_id' in session:
-        return redirect(url_for('home'))
+        # Se já estiver logado, retorna uma resposta JSON indicando sucesso.
+        return jsonify({"message": "Already logged in", "status": "success", "redirect": url_for('home')}), 200
+
     if request.method == 'POST':
         email = request.form.get('email')
         senha = request.form.get('senha')
@@ -47,10 +63,15 @@ def login():
         if usuario:
             session['usuario_id'] = usuario['id']
             session['perfil'] = usuario['perfil']
-            return redirect(url_for('home'))
+            # Retorna sucesso com uma indicação para redirecionar no cliente, se necessário.
+            return jsonify({"message": "Login successful", "status": "success", "redirect": url_for('home')}), 200
         else:
-            return render_template('login.html', error="Email ou senha incorretos")
+            # Retorna falha com uma mensagem de erro.
+            return jsonify({"message": "Email or password incorrect", "status": "failure"}), 401
+
+    # Se for uma requisição GET, simplesmente mostra o formulário de login (pode ser alterado para JSON se necessário).
     return render_template('login.html')
+
 
 @app.route('/logout')
 def logout():

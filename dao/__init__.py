@@ -28,6 +28,17 @@ def adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem):
     finally:
         conexao.close()
 
+def buscar_produto_por_nome(nome):
+    conexao = conectardb()
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute("SELECT * FROM produtos WHERE nome = %s", (nome,))
+            produto = cursor.fetchone()
+            return produto
+    finally:
+        conexao.close()
+
+
 
 def listarprodutos():
     conexao = conectardb()
