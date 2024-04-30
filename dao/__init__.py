@@ -11,13 +11,13 @@ def conectardb():
     )
     return con
 
-def adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem):
+def adicionarproduto(nome, marca, validade, preco, quantidade, caminho_completo_imagem):
     conexao = conectardb()
     try:
         with conexao.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO produtos (nome, marca, validade, preco, quantidade, caminho_imagem) VALUES (%s, %s, %s, %s, %s, %s)",
-                (nome, marca, validade, preco, quantidade, caminho_imagem)
+                (nome, marca, validade, preco, quantidade, caminho_completo_imagem)
             )
             conexao.commit()
             return True
@@ -27,6 +27,7 @@ def adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem):
         return False
     finally:
         conexao.close()
+
 
 def buscar_produto_por_nome(nome):
     conexao = conectardb()

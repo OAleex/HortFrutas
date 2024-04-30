@@ -10,18 +10,20 @@
     <div id="product-list"></div>
     <button onclick="location.href='/logout'">Logout</button>
 
-   <script>
-    window.onload = function() {
-        fetch('/products')
-            .then(response => response.json())
-            .then(data => {
-                const productList = document.getElementById('product-list');
-                data.forEach(product => {
-                    productList.innerHTML += `<p>Nome: ${product.nome} - Marca: ${product.marca} - Preço: R$${product.preco} - Validade: ${product.validade} - Quantidade: ${product.quantidade}</p>`;
-                });
-            })
-            .catch(error => console.error('Erro ao buscar frutas:', error));
-    };
+    <script>
+window.onload = function() {
+    fetch('/products')
+        .then(response => response.json())
+        .then(data => {
+            const productList = document.getElementById('product-list');
+            data.forEach(product => {
+                productList.innerHTML += `
+                    <p>Nome: ${product.nome} - Marca: ${product.marca} - Preço: R$${product.preco} - Validade: ${product.validade} - Quantidade: ${product.quantidade}</p>
+                    <img src="/static/images/${product.nome}.jpg" alt="Imagem de ${product.nome}" style="width:100px;height:auto;">`;
+            });
+        })
+        .catch(error => console.error('Erro ao buscar frutas:', error));
+};
 </script>
 
 </body>

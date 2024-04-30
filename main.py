@@ -39,7 +39,7 @@ def register():
 
 @app.route('/consume/<product_name>', methods=['GET'])
 def consume_product(product_name):
-    if 'perfil' not in session or session['perfil'] != 'ADM':
+    if 'perfil' not in session:
         return jsonify({'error': 'Não autorizado'}), 401
 
     produto = dao.buscar_produto_por_nome(product_name)
@@ -113,9 +113,10 @@ def add_product():
 
 def handle_image_upload(imagem):
     filename = secure_filename(imagem.filename)
-    caminho_imagem = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    imagem.save(caminho_imagem)
-    return filename
+    caminho_completo_imagem = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    imagem.save(caminho_completo_imagem)
+    return caminho_completo_imagem  # Agora retorna o caminho completo
+
 
 
 
