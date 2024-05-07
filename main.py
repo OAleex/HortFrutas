@@ -1,4 +1,6 @@
-from flask import Flask, request, session, redirect, url_for, render_template, jsonify, abort, send_from_directory
+import psycopg2
+from flask import Flask, request, session, redirect, url_for, render_template, jsonify, abort, send_from_directory, \
+    flash
 from werkzeug.utils import secure_filename
 import dao
 from dao import criar_tabelas
@@ -78,6 +80,23 @@ def login():
 
     return render_template('login.html')
 
+@app.route('/admin/manage-users')
+def manage_users():
+    if 'perfil' in session and session['perfil'] == 'ADM':
+        usuarios = dao.listar_usuarios()
+        return render_template('adm_gerenciar_usuarios.html', usuarios=usuarios)
+    else:
+        return redirect(url_for('login'))
+def delete_user(user_id):
+    if 'perfil' in session and session['perfil'] == 'ADM':
+        if dao.excluir_usuario(user_id):
+            return jsonify({"message": "Usuário excluído com sucesso!"}), 200
+        else:
+            return jsonify({"message": "Erro ao excluir usuário"}), 400
+    else:
+        return jsonify({"error": "Acesso negado"}), 403
+
+
 
 @app.route('/logout')
 def logout():
@@ -104,25 +123,63 @@ def add_product():
         caminho_imagem = handle_image_upload(imagem)
         sucesso = dao.adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem)
         if sucesso:
-            return jsonify({"message": "Produto adicionado com sucesso!"}), 201
+            flash("Produto adicionado com sucesso!", "success")
         else:
-            return jsonify({"message": "Erro ao adicionar produto"}), 500
+            flash("Erro ao adicionar produto", "error")
+        return redirect(url_for('home'))
     else:
         abort(403)
+
+@app.route('/delete-product/<int:product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    if 'perfil' in session and session['perfil'] == 'ADM':
+        try:
+            success = dao.excluir_produto(product_id)
+            if success:
+                return jsonify({"message": "Produto excluído com sucesso!"}), 200
+            else:
+                return jsonify({"message": "Erro ao excluir produto"}), 500
+        except Exception as e:
+            return jsonify({"message": f"Erro interno ao excluir produto: {str(e)}"}), 500
+    else:
+        return jsonify({"error": "Acesso negado"}), 403
 
 
 def handle_image_upload(imagem):
     filename = secure_filename(imagem.filename)
     caminho_completo_imagem = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     imagem.save(caminho_completo_imagem)
-    return caminho_completo_imagem  # Agora retorna o caminho completo
-
-
+    return caminho_completo_imagem
 
 
 @app.route('/Produtos/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/admin/users', methods=['GET'])
+def list_users():
+    if 'perfil' in session and session['perfil'] == 'ADM':
+        try:
+            users = dao.listar_usuarios()
+            print("Usuários carregados:", users)
+            return jsonify(users)
+        except Exception as e:
+            print("Erro:", e)
+            return jsonify({'error': str(e)}), 500
+    else:
+        return jsonify({'error': 'Acesso não autorizado'}), 403
+
+
+@app.route('/admin/user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if 'perfil' in session and session['perfil'] == 'ADM':
+        if dao.excluir_usuario(user_id):
+            return jsonify({"message": "Usuário excluído com sucesso!"}), 200
+        else:
+            return jsonify({"message": "Erro ao excluir usuário"}), 500
+    else:
+        return jsonify({"error": "Acesso negado"}), 403
+
 
 if __name__ == '__main__':
     criar_tabelas()

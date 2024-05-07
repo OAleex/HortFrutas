@@ -43,11 +43,12 @@ def buscar_produto_por_nome(nome):
 
 def listarprodutos():
     conexao = conectardb()
-    cur = conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
-    cur.execute("SELECT nome, marca, validade, preco, quantidade, caminho_imagem FROM produtos")
+    cur = conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT id, nome, marca, validade, preco, quantidade, caminho_imagem FROM produtos")
     produtos = cur.fetchall()
     conexao.close()
     return produtos
+
 
 
 
@@ -111,6 +112,52 @@ def criar_tabelas():
     conexao.commit()
     cur.close()
     conexao.close()
+
+def listar_usuarios():
+    conexao = conectardb()
+    try:
+        with conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute("SELECT * FROM usuarios")
+            return cursor.fetchall()
+    finally:
+        conexao.close()
+
+def excluir_usuario(user_id):
+    conexao = conectardb()
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute("DELETE FROM usuarios WHERE id = %s", (user_id,))
+            if cursor.rowcount > 0:
+                conexao.commit()
+                return True
+            else:
+                conexao.rollback()
+                return False
+    except Exception as e:
+        conexao.rollback()
+        return False
+    finally:
+        conexao.close()
+
+def excluir_produto(product_id):
+    conexao = conectardb()
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute("DELETE FROM produtos WHERE id = %s", (product_id,))
+            if cursor.rowcount == 0:
+                conexao.rollback()
+                return False
+            conexao.commit()
+            return True
+    except Exception as e:
+        conexao.rollback()
+        print(f"Erro ao excluir produto: {e}")
+        return False
+    finally:
+        conexao.close()
+
+
+
 
 if __name__ == '__main__':
     criar_tabelas()
