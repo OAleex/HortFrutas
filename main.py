@@ -1,63 +1,55 @@
-import psycopg2
-from flask import Flask, request, session, redirect, url_for, render_template, jsonify, abort, send_from_directory, \
-    flash
-from werkzeug.utils import secure_filename
+from flask import Flask, request, session, redirect, url_for, render_template, jsonify, flash
+from werkzeug.utils import secure_filename, send_from_directory
 import dao
-from dao import criar_tabelas
 import os
 from flask_cors import CORS
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
 app.secret_key = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'static/images')
 
+def is_logged_in():
+    return 'usuario_id' in session
+
+def is_admin():
+    return session.get('perfil') == 'ADM'
+
+def get_logged_user_id():
+    return session.get('usuario_id', None)
+
 @app.route('/')
 def home():
-    if 'perfil' in session:
-        if session['perfil'] == 'ADM':
-            return render_template('produtos_adm.html')
-        else:
-            return render_template('produtos_cliente.html')
-    return redirect(url_for('login'))
+    if not is_logged_in():
+        return redirect(url_for('login'))
+    if is_admin():
+        return render_template('produtos_adm.html')
+    return render_template('produtos_cliente.html')
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if 'usuario_id' in session:
+    if is_logged_in():
         return redirect(url_for('home'))
-    if request.method == 'POST':
-        email = request.form['email']
-        senha = request.form['senha']
-        perfil = request.form['perfil']
-        admin_code = request.form.get('admin-code')
-        if perfil == 'ADM' and admin_code != 'rene_eh_brabo':
-            return render_template('registro.html', error='Código de administração inválido.')
-        if dao.inseriruser(email, senha, perfil):
-            return redirect(url_for('login'))
-        else:
-            return render_template('registro.html', error='Falha ao registrar. O email já pode estar em uso.')
-    return render_template('registro.html')
+    if request.method == 'GET':
+        return render_template('registro.html')
 
-
-@app.route('/consume/<product_name>', methods=['GET'])
-def consume_product(product_name):
-    if 'perfil' not in session:
-        return jsonify({'error': 'Não autorizado'}), 401
-
-    produto = dao.buscar_produto_por_nome(product_name)
-    if produto is None:
-        return jsonify({'error': 'Produto não encontrado'}), 404
-
-    return jsonify({'message': f'Você consumiu o produto: {product_name}'}), 200
-
+    email = request.form.get('email')
+    senha = request.form.get('senha')
+    perfil = request.form.get('perfil')
+    admin_code = request.form.get('admin-code', '')
+    if perfil == 'ADM' and admin_code != 'rene_eh_brabo':
+        return render_template('registro.html', error='Código de administração inválido.')
+    if dao.inseriruser(email, senha, perfil):
+        return redirect(url_for('login'))
+    return render_template('registro.html', error='Falha ao registrar. O email já pode estar em uso.')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'usuario_id' in session:
         if request.headers.get('Accept') == 'application/json':
             return jsonify({"message": "Already logged in"}), 200
-        else:
-            return redirect(url_for('home'))
+        return redirect(url_for('home'))
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -67,34 +59,15 @@ def login():
         if usuario:
             session['usuario_id'] = usuario['id']
             session['perfil'] = usuario['perfil']
-
             if request.headers.get('Accept') == 'application/json':
                 return jsonify({"message": "Login successful", "status": "success"}), 200
-            else:
-                return redirect(url_for('home'))
+            return redirect(url_for('home'))
         else:
             if request.headers.get('Accept') == 'application/json':
                 return jsonify({"message": "Email or password incorrect", "status": "failure"}), 401
-            else:
-                return render_template('login.html', error="Email ou senha incorretos")
+            return render_template('login.html', error="Email ou senha incorretos")
 
     return render_template('login.html')
-
-@app.route('/admin/manage-users')
-def manage_users():
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        usuarios = dao.listar_usuarios()
-        return render_template('adm_gerenciar_usuarios.html', usuarios=usuarios)
-    else:
-        return redirect(url_for('login'))
-def delete_user(user_id):
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        if dao.excluir_usuario(user_id):
-            return jsonify({"message": "Usuário excluído com sucesso!"}), 200
-        else:
-            return jsonify({"message": "Erro ao excluir usuário"}), 400
-    else:
-        return jsonify({"error": "Acesso negado"}), 403
 
 
 
@@ -105,44 +78,89 @@ def logout():
 
 @app.route('/products', methods=['GET'])
 def products():
-    if 'perfil' in session:
-        produtos = dao.listarprodutos()
-        return jsonify(produtos)
-    else:
+    if not is_logged_in():
         return jsonify({'error': 'Não autorizado'}), 401
+    produtos = dao.listarprodutos()
+    return jsonify(produtos)
 
 @app.route('/add-product', methods=['POST'])
 def add_product():
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        nome = request.form['nome']
-        marca = request.form['marca']
-        validade = request.form['validade']
-        preco = request.form['preco']
-        quantidade = request.form['quantidade']
-        imagem = request.files['image']
-        caminho_imagem = handle_image_upload(imagem)
-        sucesso = dao.adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem)
-        if sucesso:
-            flash("Produto adicionado com sucesso!", "success")
-        else:
-            flash("Erro ao adicionar produto", "error")
+    if not is_admin():
+        os.abort(403)
+    nome = request.form.get('nome')
+    marca = request.form.get('marca')
+    validade = request.form.get('validade')
+    preco = request.form.get('preco')
+    quantidade = request.form.get('quantidade')
+    imagem = request.files['image']
+    caminho_imagem = handle_image_upload(imagem)
+    if dao.adicionarproduto(nome, marca, validade, preco, quantidade, caminho_imagem):
+        flash("Produto adicionado com sucesso!", "success")
         return redirect(url_for('home'))
-    else:
-        abort(403)
+    flash("Erro ao adicionar produto", "error")
+    return redirect(url_for('home'))
 
 @app.route('/delete-product/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        try:
-            success = dao.excluir_produto(product_id)
-            if success:
-                return jsonify({"message": "Produto excluído com sucesso!"}), 200
-            else:
-                return jsonify({"message": "Erro ao excluir produto"}), 500
-        except Exception as e:
-            return jsonify({"message": f"Erro interno ao excluir produto: {str(e)}"}), 500
-    else:
+    if not is_admin():
         return jsonify({"error": "Acesso negado"}), 403
+    if dao.excluir_produto(product_id):
+        return jsonify({"message": "Produto excluído com sucesso!"}), 200
+    return jsonify({"message": "Erro ao excluir produto"}), 500
+
+@app.route('/admin/manage-users', methods=['GET'])
+def manage_users():
+    if not is_admin():
+        return redirect(url_for('login'))
+    usuarios = dao.listar_usuarios()
+    return render_template('adm_gerenciar_usuarios.html', usuarios=usuarios)
+
+
+@app.route('/admin/user/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    if not is_admin():
+        return jsonify({"error": "Acesso negado"}), 403
+
+    logged_user_id = get_logged_user_id()
+    if user_id == logged_user_id:
+        return jsonify({"error": "Operação não permitida. Você não pode excluir sua própria conta."}), 403
+
+    if dao.excluir_usuario(user_id):
+        return jsonify({"message": "Usuário excluído com sucesso!"}), 200
+    else:
+        return jsonify({"message": "Erro ao excluir usuário"}), 500
+
+@app.route('/order-product-by-name/<product_name>/<int:quantity>', methods=['GET'])
+def order_product_by_name(product_name, quantity):
+    if not is_logged_in():
+        return jsonify({'error': 'Não autorizado'}), 403
+
+    product = dao.buscar_produto_por_nome(product_name)
+    if product is None:
+        return jsonify({'error': 'Produto nao encontrado'}), 404
+
+    if product['quantidade'] < quantity:
+        return jsonify({'error': 'Quantidade solicitada nao disponivel'}), 400
+
+    success = dao.atualizar_quantidade_produto(product['id'], product['quantidade'] - quantity)
+    if success:
+        return jsonify({"message": "Pedido realizado com sucesso!"}), 200
+    else:
+        return jsonify({"error": "Falha ao realizar pedido"}), 500
+
+@app.route('/products-near-expiry', methods=['GET'])
+def products_near_expiry():
+    if not is_logged_in():
+        return jsonify({'error': 'Não autorizado'}), 401
+
+    today = datetime.now().date()
+    expiry_limit = today + timedelta(days=7)
+
+    try:
+        products = dao.fetch_products_near_expiry(today, expiry_limit)
+        return jsonify(products)
+    except Exception as e:
+        return jsonify({"error": "Erro ao buscar produtos: " + str(e)}), 500
 
 
 def handle_image_upload(imagem):
@@ -151,36 +169,10 @@ def handle_image_upload(imagem):
     imagem.save(caminho_completo_imagem)
     return caminho_completo_imagem
 
-
 @app.route('/Produtos/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-@app.route('/admin/users', methods=['GET'])
-def list_users():
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        try:
-            users = dao.listar_usuarios()
-            print("Usuários carregados:", users)
-            return jsonify(users)
-        except Exception as e:
-            print("Erro:", e)
-            return jsonify({'error': str(e)}), 500
-    else:
-        return jsonify({'error': 'Acesso não autorizado'}), 403
-
-
-@app.route('/admin/user/<int:user_id>', methods=['DELETE'])
-def delete_user(user_id):
-    if 'perfil' in session and session['perfil'] == 'ADM':
-        if dao.excluir_usuario(user_id):
-            return jsonify({"message": "Usuário excluído com sucesso!"}), 200
-        else:
-            return jsonify({"message": "Erro ao excluir usuário"}), 500
-    else:
-        return jsonify({"error": "Acesso negado"}), 403
-
-
 if __name__ == '__main__':
-    criar_tabelas()
+    dao.criar_tabelas()
     app.run(debug=True, port=5000)

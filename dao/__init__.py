@@ -39,7 +39,39 @@ def buscar_produto_por_nome(nome):
     finally:
         conexao.close()
 
+def buscar_produto_por_id(product_id):
+    conexao = conectardb()
+    try:
+        with conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute("SELECT * FROM produtos WHERE id = %s", (product_id,))
+            return cursor.fetchone()
+    finally:
+        conexao.close()
 
+def atualizar_quantidade_produto(product_id, nova_quantidade):
+    conexao = conectardb()
+    try:
+        with conexao.cursor() as cursor:
+            cursor.execute("UPDATE produtos SET quantidade = %s WHERE id = %s", (nova_quantidade, product_id))
+            conexao.commit()
+            return cursor.rowcount > 0
+    except Exception as e:
+        conexao.rollback()
+        return False
+    finally:
+        conexao.close()
+
+
+def fetch_products_near_expiry(start_date, end_date):
+    conexao = conectardb()
+    try:
+        with conexao.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cursor:
+            cursor.execute("""
+                SELECT * FROM produtos WHERE validade BETWEEN %s AND %s ORDER BY validade ASC
+            """, (start_date, end_date))
+            return cursor.fetchall()
+    finally:
+        conexao.close()
 
 def listarprodutos():
     conexao = conectardb()
@@ -68,14 +100,33 @@ def inseriruser(email, senha, perfil):
     conexao = conectardb()
     cur = conexao.cursor()
     try:
+        cur.execute("SELECT id FROM usuarios WHERE email = %s", (email,))
+        if cur.fetchone():
+            print("E-mail já cadastrado.")
+            return False
+
+        print("Tentando inserir usuário...")
         cur.execute("INSERT INTO usuarios (email, senha, perfil) VALUES (%s, %s, %s)", (email, senha, perfil))
         conexao.commit()
+        print("Usuário inserido com sucesso.")
         return True
-    except psycopg2.IntegrityError as e:
+    except psycopg2.Error as e:
+        print(f"Erro ao tentar inserir usuário: {e}")
         conexao.rollback()
         return False
     finally:
         conexao.close()
+
+def buscar_produto_por_nome(nome):
+    conexao = conectardb()
+    try:
+        with conexao.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("SELECT * FROM produtos WHERE nome = %s", (nome,))
+            produto = cursor.fetchone()
+            return produto
+    finally:
+        conexao.close()
+
 
 def verificarlogin(email, senha):
     conexao = conectardb()
